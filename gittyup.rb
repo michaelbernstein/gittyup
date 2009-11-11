@@ -32,12 +32,11 @@ BACKUP_DIR = "/Users/michael/backup/"
 
 
 def clone(origin, destination)
-#  puts "Cloning git repo at #{origin} to #{destination}"
+  puts "Cloning git repo at #{origin} to #{destination}"
   puts `git clone #{origin} #{destination}` 
 end
 
 def sync(path)
-# 
   Dir.chdir(path)  
   puts "Syncing #{path} --- " + `git pull` + "\n"
 end
