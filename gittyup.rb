@@ -13,7 +13,8 @@
 # all copies or substantial portions of the Software.
 # 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTA
+# BILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
@@ -24,73 +25,62 @@
 #Script to backup all .git files from a given repository to
 #a backup repository.   Traverses file trees.
 
+require 'fileutils'
 
 BASE_DIR = "/var/git/"
 BACKUP_DIR = "/Users/michael/backup/"
 
 
-def clone(path)
-  puts "Cloning git repo at #{path[:from]} to #{path[:to]}"
-  Dir.chdir(path[:to])
-  puts `git clone #{path[:from]}`
+def clone(origin, destination)
+#  puts "Cloning git repo at #{origin} to #{destination}"
+  puts `git clone #{origin} #{destination}` 
 end
 
 def sync(path)
-  puts "Syncing git repo at #{path}"  
-  Dir.chdir(path)
-  puts `git pull`
+# 
+  Dir.chdir(path)  
+  puts "Syncing #{path} --- " + `git pull` + "\n"
+end
+
+
+def convert_to_backup_path(original_path, new_path, base_path)
+  new_path +  (original_path.split('/') - base_path.split('/')).join('/') + '/'
+end
+
+def pull_off_git_repo(path)
+  split = path.split('/')
+  split[0..split.size - 2].join('/')
+end
+
+def clone_or_sync(repo_name, origin, destination)
+  #Check to see if the destination + repo_name exist
+  if Dir.exist?(destination + '/' + repo_name)
+    sync(destination + '/' + repo_name)
+  else
+    clone(origin, destination + '/' + repo_name)
+  end
 end
 
 def traverse_git_directory(path)
   #Make sure we have the trailing slash on all paths.
   path[path.length] = "/" if path[path.length - 1].chr != '/'
 
+  #Grab all the directories in the given path
   b = Dir[path + "*"]
   
+  #Get all the directories with git in them
   gits = b.select {|x| x.split('.').last == 'git'}
+  
+  gits.each do |x|
+    path = pull_off_git_repo(convert_to_backup_path(x, BACKUP_DIR, BASE_DIR))
+    FileUtils.mkdir_p(path) unless File.exist?(path)
+    clone_or_sync(x.split('/').last, x, path)
+  end
+
+  #Create the next level of paths
   (b - gits).each {|non_git| 
-      if File.directory?(non_git)
-        puts "Entering Directory #{non_git}"
-        gits << traverse_git_directory(non_git)
-      end
-       }
-  gits.flatten
+      traverse_git_directory(non_git) if File.directory?(non_git) 
+  }
 end
 
-
-def create_directory_structure(x)
-  git_dir = x.split('/').select {|y| y != ""}
-  sub_dir = (git_dir[0..git_dir.size - 2] -  BASE_DIR.split('/').select {|y| y!= ""})
-
-  #If it doesn't, we'll create the path
-  unless sub_dir.empty? || File.exists?(BACKUP_DIR + sub_dir.join('/'))
-    puts "Doesn't exist - Creating dir: #{BACKUP_DIR + sub_dir.join('/')}"
-    Dir.mkdir(BACKUP_DIR + sub_dir.join('/'))
-  end
-end
-
-def create_action_lists
-to_clone = []
-to_sync = []
-
-  traverse_git_directory(BASE_DIR).each do |x|
-    #step 1, check to see if the entire path exists
-    dir = BACKUP_DIR + (x.split('/') - BASE_DIR.split('/')).join('/').split(".git")[0]
-
-    if File.exists?(dir)
-      #These are the directories that exist already that are to be cloned!
-      to_sync << dir
-    else
-      create_directory_structure(x)
-      temp = dir.split('/')
-      to_clone << {:to => temp[0..temp.size - 2].join('/'), :from => x}
-    end
-  end
-  [to_clone, to_sync]
-end
-
-
-list = create_action_lists
-list[0].each {|clone_item| clone(clone_item) }
-list[1].each {|sync_item| sync(sync_item) }
- 
+traverse_git_directory(BASE_DIR)
