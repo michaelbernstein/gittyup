@@ -53,7 +53,7 @@ end
 
 def clone_or_sync(repo_name, origin, destination)
   #Check to see if the destination + repo_name exist
-  if Dir.exist?(destination + '/' + repo_name)
+  if File.exist?(destination + '/' + repo_name)
     sync(destination + '/' + repo_name)
   else
     clone(origin, destination + '/' + repo_name)
@@ -62,7 +62,7 @@ end
 
 def traverse_git_directory(path)
   #Make sure we have the trailing slash on all paths.
-  path[path.length] = "/" if path[path.length - 1].chr != '/'
+  path << '/' if path[path.length - 1].chr != '/'
 
   #Grab all the directories in the given path
   b = Dir[path + "*"]
